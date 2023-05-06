@@ -1,0 +1,26 @@
+{
+  "allow_commit": [
+    {
+      "id_task": 1,
+      "list_commit": [
+        {
+          "commit": "commit"
+        },
+        {
+          "commit": "branch"
+        }
+      ]
+    },
+    {
+     "id_task": 2,
+      "list_commit": [
+        {
+          "commit": "commit"
+        },
+        {
+          "commit": "branch"
+        }
+      ]
+    }
+  ]
+}
