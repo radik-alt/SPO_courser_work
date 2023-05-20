@@ -2,6 +2,8 @@ import os
 
 import git
 from django.http import HttpResponse
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from git_branch import models
@@ -30,16 +32,6 @@ class LevelsApi(APIView):
             "message": message
         })
 
-    def post(self, request):
-        return Response({"status": -1, "message": "post запрос не разрешен! Иди нахуй Сагид!"})
-
-    def update(self, requet):
-        return Response({"status": -1, "message": "update запрос не разрешен"})
-
-    def delete(self, request):
-        return Response({"status": -1, "message": "update запрос не разрешен"})
-
-
 class TaskApi(APIView):
     def get(self, request):
         tasks = models.Task.objects.all().values()
@@ -67,7 +59,7 @@ class TaskFromLevel(APIView):
             message = f"Нет данных о задаче по данном уровню"
             status = -1
         else:
-            message = f"Список задач по id_ta"
+            message = f"Список задач по уровню"
             status = 0
 
         serializer = TaskSerializer(tasks, many=True)
@@ -79,6 +71,8 @@ class TaskFromLevel(APIView):
         })
 
 
+
+
 class TaskInfoApiView(APIView):
     def get(self, request, task_id):
         try:
@@ -87,7 +81,7 @@ class TaskInfoApiView(APIView):
             return Response({
                 "tasks": [],
                 "status": -1,
-                "message": "Error"
+                "message": "Error базы данных"
             })
 
         if tasks.count() == 0:
@@ -105,6 +99,14 @@ class TaskInfoApiView(APIView):
             "message": message
         })
 
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'solve': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+            }
+        )
+    )
     def patch(self, request, task_id):
         task = Task.objects.filter(id=task_id)
 
@@ -125,6 +127,8 @@ class TaskInfoApiView(APIView):
             "status": status,
             "message": message
         })
+
+
 
 
 class GitInfoApiView(APIView):
@@ -149,3 +153,5 @@ class GitInfoApiView(APIView):
             "status": status,
             "message": message
         })
+
+
