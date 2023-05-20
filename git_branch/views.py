@@ -58,7 +58,6 @@ class TaskApi(APIView):
         })
 
 
-
 class TaskFromLevel(APIView):
 
     def get(self, request, level):
@@ -82,7 +81,15 @@ class TaskFromLevel(APIView):
 
 class TaskInfoApiView(APIView):
     def get(self, request, task_id):
-        tasks = Task.objects.filter(id = task_id)
+        try:
+            tasks = Task.objects.filter(id=task_id)
+        except:
+            return Response({
+                "tasks": [],
+                "status": -1,
+                "message": "Error"
+            })
+
         if tasks.count() == 0:
             message = f"Нет данных о задаче по данном task_id"
             status = -1
@@ -98,7 +105,26 @@ class TaskInfoApiView(APIView):
             "message": message
         })
 
-    # def path(self, request, solve):
+    def patch(self, request, task_id):
+        task = Task.objects.filter(id=task_id)
+
+        try:
+            task.update(solve = request.data.get("solve"))
+        except:
+            response = Response({
+                "status": -1,
+                "message": "Ошибка обнолвения данных"
+            })
+            response.status_code = 400
+            return response
+
+        message = "Данные обновлены"
+        status = 0
+
+        return Response({
+            "status": status,
+            "message": message
+        })
 
 
 class GitInfoApiView(APIView):
