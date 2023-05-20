@@ -68,7 +68,7 @@ class TaskFromLevel(APIView):
             message = f"Нет данных о задаче по данном уровню"
             status = -1
         else:
-            message = f"Список задач по уровню"
+            message = f"Список задач по id_ta"
             status = 0
 
         serializer = TaskSerializer(tasks, many=True)
@@ -78,6 +78,27 @@ class TaskFromLevel(APIView):
             "status": status,
             "message": message
         })
+
+
+class TaskInfoApiView(APIView):
+    def get(self, request, task_id):
+        tasks = Task.objects.filter(id = task_id)
+        if tasks.count() == 0:
+            message = f"Нет данных о задаче по данном task_id"
+            status = -1
+        else:
+            message = f"Список задач по task_id"
+            status = 0
+
+        serializer = TaskSerializer(tasks, many=True)
+
+        return Response({
+            "tasks": serializer.data,
+            "status": status,
+            "message": message
+        })
+
+    # def path(self, request, solve):
 
 
 class GitInfoApiView(APIView):
