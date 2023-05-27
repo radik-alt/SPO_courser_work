@@ -1,7 +1,8 @@
 import os
+import subprocess
 
 import git
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.response import Response
@@ -31,6 +32,7 @@ class LevelsApi(APIView):
             "status": status,
             "message": message
         })
+
 
 class TaskApi(APIView):
     def get(self, request):
@@ -71,8 +73,6 @@ class TaskFromLevel(APIView):
         })
 
 
-
-
 class TaskInfoApiView(APIView):
     def get(self, request, task_id):
         try:
@@ -111,7 +111,7 @@ class TaskInfoApiView(APIView):
         task = Task.objects.filter(id=task_id)
 
         try:
-            task.update(solve = request.data.get("solve"))
+            task.update(solve=request.data.get("solve"))
         except:
             response = Response({
                 "status": -1,
@@ -129,29 +129,40 @@ class TaskInfoApiView(APIView):
         })
 
 
-
-
 class GitInfoApiView(APIView):
 
     def get(self, request):
-        message = "Список уровней"
+        message = "Список команды для git"
         status = 0
 
-        repo = git.Repo('.')
-        commands = {}
+        commands = [
+            {
+                "description": "Как задать имя пользователя и адрес электронной почты",
+                "command": f"git config --global user.name 'username' \n git config --global user.email 'email' "
+            },
+            {
+                "description": "Инициализация репозитория",
+                "command": "git init",
+            },
+            {
+                "description": "Добавление отдельных файлов или всех файлов в область подготовленных файлов",
+                "command": "git add file.расширение либо git add . (для всех файлов)",
+            },
+            {
+                "description": "Проверка статуса репозитория", "command": "git status",
+            },
+            {
+                "description": "Внесение изменений однострочным сообщением или через редактор",
+                "command": "git commit -m 'commit' либо git commit"
+            },
+            {
+                "description":"Просмотр истории коммитов с изменениями", "command": "git log -p"
+            }
+        ]
 
-        git_cmd = repo.git
-        git_commands = git_cmd.execute(['help', '-a'], encoding='UTF-8', errors='ignore').splitlines()
-
-        for command in git_commands:
-            if not command.startswith(' '):
-                command_name = command.split()[0]
-                command_desc = ' '.join(command.split()[1:])
-                commands[command_name] = command_desc
         return Response({
             "commands": commands,
             "status": status,
             "message": message
         })
-
 
