@@ -27,7 +27,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -39,10 +38,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'git_branch.apps.GitBranchConfig',
     'rest_framework',
-    'drf_yasg'
+    'drf_yasg',
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -51,6 +52,16 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    # Список разрешенных доменов
+    'http://localhost:5000',
+    'https://localhost:5000',
+]
+
+CORS_ALLOW_CREDENTIALS= True
+
+
 
 ROOT_URLCONF = 'SPO_courser_work.urls'
 

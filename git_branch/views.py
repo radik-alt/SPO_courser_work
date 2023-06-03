@@ -1,7 +1,3 @@
-import os
-import subprocess
-
-import git
 from django.http import HttpResponse, JsonResponse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
