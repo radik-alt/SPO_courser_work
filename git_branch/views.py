@@ -1,15 +1,10 @@
-import os
-import subprocess
-
-import git
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from git_branch import models
 from git_branch.serializer import *
-
 
 def index(request):
     return HttpResponse("Главная страница")

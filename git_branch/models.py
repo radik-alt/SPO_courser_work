@@ -31,7 +31,7 @@ class Info(models.Model):
 
 class InfoDetail(models.Model):
     info = models.ForeignKey(Info, on_delete=models.CASCADE)
-    content = models.CharField(max_length=255)
+    content = models.TextField()
 
     def __str__(self):
         return f"Content {self.id}"
