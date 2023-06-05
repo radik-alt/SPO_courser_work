@@ -47,12 +47,12 @@ class Node(models.Model):
     ]
 
     name = models.CharField(max_length=100)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+    parent = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='children')
     type = models.IntegerField(choices=TYPE_CHOICES)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} {self.id}"
 
 
 class NodeSolve(models.Model):
@@ -65,12 +65,12 @@ class NodeSolve(models.Model):
     ]
 
     name = models.CharField(max_length=100)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+    parent = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='children')
     type = models.IntegerField(choices=TYPE_CHOICES)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} {self.id}"
 
 
 class RemoteNode(models.Model):
@@ -83,12 +83,12 @@ class RemoteNode(models.Model):
     ]
 
     name = models.CharField(max_length=100)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+    parent = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='children')
     type = models.IntegerField(choices=TYPE_CHOICES)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} {self.id}"
 
 
 class RemoteNodeSolve(models.Model):
@@ -101,9 +101,9 @@ class RemoteNodeSolve(models.Model):
     ]
 
     name = models.CharField(max_length=100)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+    parent = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='children')
     type = models.IntegerField(choices=TYPE_CHOICES)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} {self.id}"
