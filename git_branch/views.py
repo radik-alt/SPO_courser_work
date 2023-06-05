@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from git_branch import models
 from git_branch.serializer import *
 
+
 def index(request):
     return HttpResponse("Главная страница")
 
@@ -151,7 +152,7 @@ class GitInfoApiView(APIView):
                 "command": "git commit -m 'commit' либо git commit"
             },
             {
-                "description":"Просмотр истории коммитов с изменениями", "command": "git log -p"
+                "description": "Просмотр истории коммитов с изменениями", "command": "git log -p"
             }
         ]
 
@@ -161,3 +162,17 @@ class GitInfoApiView(APIView):
             "message": message
         })
 
+
+class GetGraphOfTask(APIView):
+
+    def get(self, request, task_id):
+        return Response(
+            {
+                "started_graph": None,
+                "solve_graph": None,
+                "remote_graph": None,
+                "solve_remote_graph": None,
+                "status": 0,
+                "message": "Графы по задаче"
+            }
+        )
