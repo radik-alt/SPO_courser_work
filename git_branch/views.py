@@ -151,7 +151,7 @@ class GitInfoApiView(APIView):
                 "command": "git commit -m 'commit' либо git commit"
             },
             {
-                "description":"Просмотр истории коммитов с изменениями", "command": "git log -p"
+                "description": "Просмотр истории коммитов с изменениями", "command": "git log -p"
             }
         ]
 
@@ -161,3 +161,23 @@ class GitInfoApiView(APIView):
             "message": message
         })
 
+
+class GetGraphOfTask(APIView):
+
+    def get(self, request, task_id):
+        nodes = Node.objects.filter(task_id = task_id)
+        nodes_serializer = NodeSerializer(nodes, many=True)
+
+        nodes_solve = NodeSolve.objects.filter(task_id=task_id)
+        node_solve_serializer = NodeSolveSerializer(nodes_solve, many=True)
+
+        return Response(
+            {
+                "started_graph": nodes_serializer.data,
+                "solve_graph": node_solve_serializer.data,
+                "remote_graph": None,
+                "solve_remote_graph": None,
+                "status": 0,
+                "message": "Графы по задаче"
+            }
+        )

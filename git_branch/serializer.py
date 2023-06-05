@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from git_branch.models import Levels, Task, InfoDetail, Info
+from git_branch.models import Levels, Task, InfoDetail, Info, Node, NodeSolve
 
 
 class LevelsSerializers(serializers.ModelSerializer):
@@ -33,3 +33,30 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = ["solve"]
+
+
+class NodeSerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Node
+        fields = ['id', 'name', 'parent', 'type', 'children']
+
+    def get_children(self, obj):
+        # Рекурсивно сериализуем дочерние узлы
+        children = obj.children.all()
+        serializer = NodeSerializer(children, many=True)
+        return serializer.data
+
+class NodeSolveSerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+
+    class Meta:
+        model = NodeSolve
+        fields = ['id', 'name', 'parent', 'type', 'children']
+
+    def get_children(self, obj):
+        # Рекурсивно сериализуем дочерние узлы
+        children = obj.children.all()
+        serializer = NodeSolveSerializer(children, many=True)
+        return serializer.data
