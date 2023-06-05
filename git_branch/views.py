@@ -6,7 +6,6 @@ from rest_framework.views import APIView
 from git_branch import models
 from git_branch.serializer import *
 
-
 def index(request):
     return HttpResponse("Главная страница")
 
@@ -166,10 +165,16 @@ class GitInfoApiView(APIView):
 class GetGraphOfTask(APIView):
 
     def get(self, request, task_id):
+        nodes = Node.objects.filter(task_id = task_id)
+        nodes_serializer = NodeSerializer(nodes, many=True)
+
+        nodes_solve = NodeSolve.objects.filter(task_id=task_id)
+        node_solve_serializer = NodeSolveSerializer(nodes_solve, many=True)
+
         return Response(
             {
-                "started_graph": None,
-                "solve_graph": None,
+                "started_graph": nodes_serializer.data,
+                "solve_graph": node_solve_serializer.data,
                 "remote_graph": None,
                 "solve_remote_graph": None,
                 "status": 0,

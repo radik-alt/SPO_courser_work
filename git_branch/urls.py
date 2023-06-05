@@ -9,5 +9,5 @@ urlpatterns = [
     path('tasks/<int:level>/', TaskFromLevel.as_view()),
     path('task_info/<int:task_id>/', TaskInfoApiView.as_view()),
     path('git_info', GitInfoApiView.as_view()),
-    path('grapth/<int:task_id>/', GetGraphOfTask.as_view())
+    path('grapth/<int:task_id>/', GetGraphOfTask.as_view()),
 ]
