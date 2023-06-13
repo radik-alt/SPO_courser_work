@@ -47,6 +47,7 @@ class Node(models.Model):
     ]
 
     name = models.CharField(max_length=100)
+    branch = models.CharField(max_length=255, null=True)
     parent = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='children')
     type = models.IntegerField(choices=TYPE_CHOICES)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, null=True, blank=True)
@@ -65,6 +66,7 @@ class NodeSolve(models.Model):
     ]
 
     name = models.CharField(max_length=100)
+    branch = models.CharField(max_length=255, null=True)
     parent = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='children')
     type = models.IntegerField(choices=TYPE_CHOICES)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, null=True, blank=True)
@@ -83,6 +85,7 @@ class RemoteNode(models.Model):
     ]
 
     name = models.CharField(max_length=100)
+    branch = models.CharField(max_length=255, null=True)
     parent = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='children')
     type = models.IntegerField(choices=TYPE_CHOICES)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, null=True, blank=True)
@@ -101,6 +104,7 @@ class RemoteNodeSolve(models.Model):
     ]
 
     name = models.CharField(max_length=100)
+    branch = models.CharField(max_length=255, null=True)
     parent = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='children')
     type = models.IntegerField(choices=TYPE_CHOICES)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, null=True, blank=True)

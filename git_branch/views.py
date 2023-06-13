@@ -1,3 +1,5 @@
+from typing import List
+
 from django.http import HttpResponse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -5,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from git_branch import models
 from git_branch.serializer import *
+
 
 def index(request):
     return HttpResponse("Главная страница")
@@ -165,7 +168,7 @@ class GitInfoApiView(APIView):
 class GetGraphOfTask(APIView):
 
     def get(self, request, task_id):
-        nodes = Node.objects.filter(task_id = task_id)
+        nodes = Node.objects.filter(task_id=task_id)
         nodes_serializer = NodeSerializer(nodes, many=True)
 
         nodes_solve = NodeSolve.objects.filter(task_id=task_id)
@@ -181,3 +184,106 @@ class GetGraphOfTask(APIView):
                 "message": "Графы по задаче"
             }
         )
+
+
+class Node:
+    def __init__(self):
+        self.name = ""
+        self.parent = []
+        self.children = []
+        self.branch = []
+        self.currentBranch = ""
+        self.currentNode = False
+
+
+class Model:
+    def __init__(self):
+        self.data = []
+        self.command = ""
+
+
+class WorkGraph(APIView):
+
+    def post(self, request):
+        data = request.data  # Get the request body
+
+        # Parse the request body and create a Model object
+        model = Model()
+        model.data = self.parse_data(data.get("data", []))
+        model.command = data.get("command", "")
+
+        status = 0
+        message = "Success"
+        try:
+            if self.valid(command=model.command):
+                _commad = model.command.split()
+                if _commad[0] != "git":
+                    raise Exception("")
+
+                if _commad[1] == "commit":
+                    pass
+                elif _commad[1] == "checkout":
+                    message = self.get_name(model.command)
+                    pass
+                elif _commad[1] == "branch":
+                    message = self.get_name(model.command)
+                    pass
+                elif _commad[1] == "push":
+                    pass
+                elif _commad[1] == "clone":
+                    pass
+            else:
+                status = -1
+                message = "Нет такой команды, проверьте правильно ли вы прописали команду"
+        except:
+            return Response({"data": None, "message": "Ошибка! Проверьте свою на правильно написана ли ваша команда", "code": -1})
+
+
+        # Perform necessary operations with the received data
+        # ...
+
+        return Response({"data": None, "message": message, "code": status})
+
+    def get_name(self, commands:str):
+        return commands.split()[2]
+
+    def all_commands(self) -> list:
+        return ["commit", "push", "branch", "checkout", "pull", "clone", "fetch"]
+
+    def valid(self, command) -> bool:
+        split_list = command.split()
+        first_word = split_list[0]
+        second_word = split_list[1]
+        return first_word == "git" and second_word in self.all_commands()
+
+    def parse_data(self, data: List[dict]) -> List[Node]:
+        nodes = []
+
+        for item in data:
+            node = Node()
+            node.name = item.get("name", "")
+            node.parent = self.parse_nodes(item.get("parent", []))
+            node.children = self.parse_nodes(item.get("children", []))
+            node.branch = item.get("branch", [])
+            node.currentBranch = item.get("currentBranch", "")
+            node.currentNode = item.get("currentNode", False)
+
+            nodes.append(node)
+
+        return nodes
+
+    def parse_nodes(self, nodes: List[dict]) -> List[Node]:
+        parsed_nodes = []
+
+        for item in nodes:
+            node = Node()
+            node.name = item.get("name", "")
+            node.parent = self.parse_nodes(item.get("parent", []))
+            node.children = self.parse_nodes(item.get("children", []))
+            node.branch = item.get("branch", [])
+            node.currentBranch = item.get("currentBranch", "")
+            node.currentNode = item.get("currentNode", False)
+
+            parsed_nodes.append(node)
+
+        return parsed_nodes

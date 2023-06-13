@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/v1/task_info/<int:task_id>/', TaskInfoApiView.as_view()),
     path('api/v1/git_info', GitInfoApiView.as_view()),
     path('api/v1/grapth/<int:task_id>/', GetGraphOfTask.as_view()),
+    path('api/v1/graph_work', WorkGraph.as_view())
 ]
 
 urlpatterns += swagger_url
