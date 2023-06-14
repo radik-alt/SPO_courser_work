@@ -1,10 +1,12 @@
+import logging
+import traceback
 from typing import List
 
 from django.http import HttpResponse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.response import Response
-from rest_framework.utils import json
+import json
 from rest_framework.views import APIView
 from git_branch import models
 from git_branch.serializer import *
@@ -229,6 +231,7 @@ class Model:
     def __init__(self):
         self.data = []
         self.command = ""
+        self.task_id = -1
 
 
 class SolveGraphApi(APIView):
@@ -249,13 +252,13 @@ class WorkGraph(APIView):
     def post(self, request):
 
         try:
-            data = request.data  # Get the request body
+            data_dict = request.data
+            print(type(data_dict))
 
-            # Parse the request body and create a Model object
             model = Model()
-            model.data: List[Node] = self.parse_data(data.get("data", []))
-            model.command = data.get("command", "")
-            model.task_id = data.get("task_id")
+            model.data: List[Node] = self.parse_data(data_dict.get("data", []))
+            model.command = data_dict.get("command", "")
+            model.task_id = data_dict.get("task_id", "")
 
             remote_allow = False
             remote_nodes: List[Node] = model.data
@@ -300,7 +303,8 @@ class WorkGraph(APIView):
 
             else:
                 raise Exception()
-        except:
+        except Exception as e:
+            print(f"Произошла ошибка: {str(e)}")
             response = Response(
                 {
                     "data": None,
@@ -326,6 +330,17 @@ class WorkGraph(APIView):
     def get_name_checkout_node(self, name):
         return f"*{name}"
 
+    def convert_node_to_dict(self, node: Node):
+        node_dict = {
+            "name": node.name,
+            "parent": [],
+            "children": [self.convert_node_to_dict(child) for child in node.children] if node.children else [],
+            "branch": node.branch,
+            "currentBranch": node.currentBranch,
+            "currentNode": node.currentNode
+        }
+        return node_dict
+
     def rebase(self, nodes: List[Node], name: str):
         node = self.find_node_by_checkout(nodes, True, None)
         origin = self.find_last_node_by_branch(nodes[0], name)
@@ -334,7 +349,6 @@ class WorkGraph(APIView):
 
         print(top_bottom)
         print(bottom_top)
-
 
     def get_list_commit_rebase(self):
         pass
@@ -379,7 +393,7 @@ class WorkGraph(APIView):
     def clear_nodes_data_merge(self, node1: Node, node2: Node):
         pass
 
-    def clear_branch_data(self, node:Node):
+    def clear_branch_data(self, node: Node):
         node.branch.remove(node.currentBranch)
         node.currentNode = False
         if node.branch:
@@ -387,14 +401,13 @@ class WorkGraph(APIView):
         else:
             node.currentBranch = ""
 
-    def clear_branch_data_checkout(self, node:Node):
+    def clear_branch_data_checkout(self, node: Node):
         node.branch.remove(self.get_name_checkout_node(node.currentBranch))
         node.currentNode = False
         if node.branch:
-            node.currentBranch =  node.branch[0]
+            node.currentBranch = node.branch[0]
         else:
             node.currentBranch = ""
-
 
     def commit(self, nodes: List[Node]):
         node = self.find_node_by_checkout(nodes, True, None)
@@ -417,8 +430,6 @@ class WorkGraph(APIView):
                 last_node = child_node
 
         return last_node
-
-
 
     def create_node(self, name: str, parent: [], children: [], branch: List[str] or None, current_branch: str,
                     current_node: bool):
@@ -446,19 +457,44 @@ class WorkGraph(APIView):
 
     def parse_data(self, data: List[dict]) -> List[Node]:
         nodes = []
+        data_list = [data]
+        try:
+            for item in data_list:
+                node = Node()
+                node.name = item.get('name', "")
+                node.parent = self.parse_nodes(item.get('parent', []))
+                node.children = self.parse_nodes(item.get('children', []))
+                node.branch = item.get('branch', [])
+                node.currentBranch = item.get('currentBranch', "")
+                node.currentNode = item.get('currentNode', False)
 
-        for item in data:
-            node = Node()
-            node.name = item.get("name", "")
-            node.parent = self.parse_nodes(item.get("parent", []))
-            node.children = self.parse_nodes(item.get("children", []))
-            node.branch = item.get("branch", [])
-            node.currentBranch = item.get("currentBranch", "")
-            node.currentNode = item.get("currentNode", False)
-
-            nodes.append(node)
+                nodes.append(node)
+        except Exception as e:
+            print("Ошибка парсинга блядь!")
+            print(f"Произошла ошибка: {e}")
+            traceback.print_exc()
 
         return nodes
+
+    def parse_nodes(self, nodes: List[dict]) -> List[Node]:
+        parsed_nodes = []
+
+        try:
+            for item in nodes:
+                node = Node()
+                node.name = item.get('name', "")
+                node.parent = self.parse_nodes(item.get('parent', []))
+                node.children = self.parse_nodes(item.get('children', []))
+                node.branch = item.get('branch', [])
+                node.currentBranch = item.get('currentBranch', "")
+                node.currentNode = item.get('currentNode', False)
+
+                parsed_nodes.append(node)
+        except Exception as e:
+            print(f"Error: {e}")
+            traceback.print_exc()
+
+        return parsed_nodes
 
     def add_branch(self, nodes: List[Node], target_current_branch: str):
         for node in nodes:
@@ -469,25 +505,40 @@ class WorkGraph(APIView):
 
     def update_current_node(self, nodes: List[Node], target_current_branch: str):
         for node in nodes:
-            node.currentNode = False  # Установка значения currentNode в False для всех узлов
-            node.branch = [branch.replace(self.get_name_checkout_node(node.currentBranch), node.currentBranch) for
-                           branch in
-                           node.branch]
+            self.change_checkout_data_to_false(node)
 
-            if node.currentBranch == target_current_branch:
+            if target_current_branch in node.branch and len(node.branch) >= 2:
+                self.change_checkout_into_one_node(node, target_current_branch)
+
+            elif node.currentBranch == target_current_branch:
                 if not node.children:
-                    node.currentBranch = target_current_branch
-                    node.currentNode = True
-                    node.branch = [branch.replace(target_current_branch, f"*{target_current_branch}") for branch in
-                                   node.branch]
-            else:
-                if node.branch:
-                    size = len(node.branch) - 1
-                    node.currentBranch = node.branch[size]
-                else:
-                    node.currentBranch = ""
+                    self.change_checkout_data_to_true(node, target_current_branch)
+            elif len(node.branch) == 0:
+                node.currentBranch = ""
 
             self.update_current_node(node.children, target_current_branch)
+
+    def change_checkout_data_to_false(self, node: Node):
+        node.currentNode = False  # Установка значения currentNode в False для всех узлов
+        node.branch = [branch.replace(self.get_name_checkout_node(node.currentBranch), node.currentBranch) for
+                       branch in
+                       node.branch]
+        node.currentBranch = node.currentBranch
+
+    def change_checkout_data_to_true(self, node: Node, target_current_branch: str):
+        node.currentBranch = target_current_branch
+        node.currentNode = True
+        node.branch = [branch.replace(target_current_branch, f"*{target_current_branch}") for branch in
+                       node.branch]
+
+    def change_checkout_into_one_node(self, node: Node, target_current_branch: str):
+        node.currentBranch = target_current_branch
+        node.currentNode = True
+        node.branch = [branch.replace(self.get_name_checkout_node(node.currentBranch), node.currentBranch) for
+                       branch in
+                       node.branch]
+        node.branch = [branch.replace(target_current_branch, f"*{target_current_branch}") for branch in
+                       node.branch]
 
     def update_current_node_start(self, nodes: List[Node], target_current_branch: str):
         for node in nodes:
@@ -511,19 +562,3 @@ class WorkGraph(APIView):
             if found_node:
                 return found_node
         return None
-
-    def parse_nodes(self, nodes: List[dict]) -> List[Node]:
-        parsed_nodes = []
-
-        for item in nodes:
-            node = Node()
-            node.name = item.get("name", "")
-            node.parent = self.parse_nodes(item.get("parent", []))
-            node.children = self.parse_nodes(item.get("children", []))
-            node.branch = item.get("branch", [])
-            node.currentBranch = item.get("currentBranch", "")
-            node.currentNode = item.get("currentNode", False)
-
-            parsed_nodes.append(node)
-
-        return parsed_nodes
