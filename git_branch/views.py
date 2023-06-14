@@ -197,6 +197,7 @@ class Node:
         self.currentBranch = ""
         self.currentNode = False
         self.type = 0
+        self.visible = True
 
     def __str__(self):
         return f"Node(name={self.name}, parent={self.parent}, children={self.children}, " \
@@ -230,6 +231,19 @@ class Model:
         self.command = ""
 
 
+class SolveGraphApi(APIView):
+
+    def __pos__(self, request):
+        # graph: List[Node] = self.parse_data(request.data.get("data", []))
+        # task_id = request.data.get("task_id", -1)
+
+        return Response({
+            "solve": False,
+            "result": 0,
+            "message": "Проверка решение задачи!"
+        })
+
+
 class WorkGraph(APIView):
 
     def post(self, request):
@@ -243,14 +257,15 @@ class WorkGraph(APIView):
             model.command = data.get("command", "")
             model.task_id = data.get("task_id")
 
+            remote_allow = False
+            remote_nodes: List[Node] = model.data
+
             status = 0
             message = "Success"
 
             if self.valid(command=model.command):
                 _commad = model.command.split()
-                if _commad[0] != "git":
-                    raise Exception("")
-                print(_commad)
+
                 if _commad[1] == "commit":
                     if self.find_node_by_checkout(model.data, True, None) is None:
                         raise Exception()
@@ -268,14 +283,20 @@ class WorkGraph(APIView):
                     name = self.get_name(model.command)
                     self.add_branch(model.data, name)
 
+                elif _commad[1] == "rebase":
+                    name = self.get_name(model.command)
+                    self.rebase(model.data, name)
+
                 elif _commad[1] == "merge":
                     name = self.get_name(model.command)
                     self.merge(model.data, name)
 
                 elif _commad[1] == "push":
-                    pass
+                    remote_allow = True
+                    remote_nodes = model.data
+
                 elif _commad[1] == "clone":
-                    pass
+                    remote_allow = True
 
             else:
                 raise Exception()
@@ -290,31 +311,90 @@ class WorkGraph(APIView):
             response.status_code = 200
             return response
 
-            # Perform necessary operations with the received data
-        # ...
         serialized_nodes = json.dumps([node.to_dict() for node in model.data])
+
+        serialized_nodes_remote = None
+        if remote_allow:
+            serialized_nodes_remote = json.dumps([node.to_dict() for node in remote_nodes])
 
         return Response({
             "data": serialized_nodes,
-            "remote_data": None,
+            "remote_data": serialized_nodes_remote,
             "message": message,
             "code": status})
 
     def get_name_checkout_node(self, name):
         return f"*{name}"
 
+    def rebase(self, nodes: List[Node], name: str):
+        node = self.find_node_by_checkout(nodes, True, None)
+        origin = self.find_last_node_by_branch(nodes[0], name)
+        top_bottom = self.valid_rebase_top_to_down(node, origin)
+        bottom_top = self.valid_rebase_top_to_down(origin, node)
+
+        print(top_bottom)
+        print(bottom_top)
+
+
+    def get_list_commit_rebase(self):
+        pass
+
+    def valid_rebase_top_to_down(self, branch_one: Node, branch_two) -> bool:
+        for node in branch_one.children:
+
+            if node.children:
+                if branch_two in node.children:
+                    return True
+                self.valid_rebase_top_to_down(node.children, branch_two)
+            else:
+                return False
+
     def merge(self, nodes: List[Node], name: str):
         node = self.find_node_by_checkout(nodes, True, None)
         if not name == node.currentBranch:
             origin = self.find_last_node_by_branch(nodes[0], name)
             merge = self.merge_nodes(node, origin)
-            node.children.append(merge)
-            origin.children.append(merge)
+            other_merge = self.merge_nodes(node, origin)
 
-            origin.branch.remove(origin.currentBranch)
-            origin.currentBranch = ""
+            self.clear_branch_data_checkout(other_merge)
+            origin.children.append(other_merge)
+
+            self.clear_branch_data_checkout(node)
+            node.children.append(merge)
+
         else:
             raise Exception()
+
+    def merge_nodes(self, node1: Node, node2: Node) -> Node:
+        merged_node = Node()
+        merged_node.name = "C"
+        merged_node.children = []
+        merged_node.parent = []
+        merged_node.branch.append(self.get_name_checkout_node(node1.currentBranch))
+        merged_node.currentBranch = node1.currentBranch
+        merged_node.currentNode = node1.currentNode
+        merged_node.type = 2
+        return merged_node
+
+    def clear_nodes_data_merge(self, node1: Node, node2: Node):
+        pass
+
+    def clear_branch_data(self, node:Node):
+        node.branch.remove(node.currentBranch)
+        node.currentNode = False
+        if node.branch:
+            node.currentBranch = node.branch[0]
+        else:
+            node.currentBranch = ""
+
+    def clear_branch_data_checkout(self, node:Node):
+        node.branch.remove(self.get_name_checkout_node(node.currentBranch))
+        node.currentNode = False
+        if node.branch:
+            node.currentBranch =  node.branch[0]
+        else:
+            node.currentBranch = ""
+
 
     def commit(self, nodes: List[Node]):
         node = self.find_node_by_checkout(nodes, True, None)
@@ -338,15 +418,7 @@ class WorkGraph(APIView):
 
         return last_node
 
-    def merge_nodes(self, node1: Node, node2: Node) -> Node:
-        merged_node = Node()
-        merged_node.name = "C"
-        merged_node.children = []
-        merged_node.parent = []
-        merged_node.currentBranch = node2.currentBranch
-        merged_node.currentNode = node1.currentNode
-        merged_node.type = 2
-        return merged_node
+
 
     def create_node(self, name: str, parent: [], children: [], branch: List[str] or None, current_branch: str,
                     current_node: bool):
@@ -364,7 +436,7 @@ class WorkGraph(APIView):
         return commands.split()[2]
 
     def all_commands(self) -> list:
-        return ["commit", "push", "branch", "checkout", "pull", "clone", "fetch", "merge"]
+        return ["commit", "push", "branch", "checkout", "pull", "clone", "fetch", "merge", "rebase"]
 
     def valid(self, command) -> bool:
         split_list = command.split()
@@ -401,7 +473,6 @@ class WorkGraph(APIView):
             node.branch = [branch.replace(self.get_name_checkout_node(node.currentBranch), node.currentBranch) for
                            branch in
                            node.branch]
-            print(target_current_branch)
 
             if node.currentBranch == target_current_branch:
                 if not node.children:
@@ -410,7 +481,11 @@ class WorkGraph(APIView):
                     node.branch = [branch.replace(target_current_branch, f"*{target_current_branch}") for branch in
                                    node.branch]
             else:
-                node.currentBranch = ""
+                if node.branch:
+                    size = len(node.branch) - 1
+                    node.currentBranch = node.branch[size]
+                else:
+                    node.currentBranch = ""
 
             self.update_current_node(node.children, target_current_branch)
 
