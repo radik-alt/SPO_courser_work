@@ -207,6 +207,7 @@ class Node:
 
     def to_dict(self):
         return {
+            "id": self.id,
             "name": self.name,
             "parent": [node.to_dict() for node in self.parent],
             "children": [node.to_dict() for node in self.children],
@@ -218,6 +219,7 @@ class Node:
     @classmethod
     def from_dict(cls, data):
         node = cls()
+        node.id = data.get("id", "")
         node.name = data.get("name", "")
         node.parent = [cls.from_dict(item) for item in data.get("parent", [])]
         node.children = [cls.from_dict(item) for item in data.get("children", [])]
@@ -381,7 +383,8 @@ class WorkGraph(APIView):
 
     def merge_nodes(self, node1: Node, node2: Node) -> Node:
         merged_node = Node()
-        merged_node.name = "C"
+        merged_node.id = node1.id + 1
+        merged_node.name = f"C{node1.id + 1}"
         merged_node.children = []
         merged_node.parent = []
         merged_node.branch.append(self.get_name_checkout_node(node1.currentBranch))
@@ -411,7 +414,9 @@ class WorkGraph(APIView):
 
     def commit(self, nodes: List[Node]):
         node = self.find_node_by_checkout(nodes, True, None)
-        new_commit = self.create_node(name="C", parent=[], children=[], branch=[node.currentBranch],
+        print(node)
+        new_commit = self.create_node(id=node.id + 1, name=f"C{node.id + 1}", parent=[], children=[],
+                                      branch=[self.get_name_checkout_node(node.currentBranch)],
                                       current_branch=node.currentBranch, current_node=True)
         node.branch.remove(self.get_name_checkout_node(node.currentBranch))
         node.currentBranch = ""
@@ -431,9 +436,10 @@ class WorkGraph(APIView):
 
         return last_node
 
-    def create_node(self, name: str, parent: [], children: [], branch: List[str] or None, current_branch: str,
+    def create_node(self, id: int, name: str, parent: [], children: [], branch: List[str] or None, current_branch: str,
                     current_node: bool):
         node = Node()
+        node.id = id
         node.name = name
         node.parent = parent or []
         node.children = children or []
@@ -461,6 +467,7 @@ class WorkGraph(APIView):
         try:
             for item in data_list:
                 node = Node()
+                node.id = item.get("id", -1)
                 node.name = item.get('name', "")
                 node.parent = self.parse_nodes(item.get('parent', []))
                 node.children = self.parse_nodes(item.get('children', []))
@@ -482,6 +489,7 @@ class WorkGraph(APIView):
         try:
             for item in nodes:
                 node = Node()
+                node.id = item.get("id", -1)
                 node.name = item.get('name', "")
                 node.parent = self.parse_nodes(item.get('parent', []))
                 node.children = self.parse_nodes(item.get('children', []))
