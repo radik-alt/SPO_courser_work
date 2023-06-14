@@ -60,3 +60,12 @@ class NodeSolveSerializer(serializers.ModelSerializer):
         children = obj.children.all()
         serializer = NodeSolveSerializer(children, many=True)
         return serializer.data
+
+
+class NodeSerializerGraph(serializers.Serializer):
+    name = serializers.CharField()
+    parent = serializers.ListField(child=serializers.DictField(), allow_empty=True)
+    children = serializers.ListField(child=serializers.DictField(), allow_empty=True)
+    branch = serializers.ListField(child=serializers.CharField(), allow_empty=True)
+    currentBranch = serializers.CharField()
+    currentNode = serializers.BooleanField()
