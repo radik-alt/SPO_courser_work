@@ -1,5 +1,6 @@
 import logging
 import traceback
+from collections import deque
 from typing import List
 
 from django.http import HttpResponse
@@ -202,14 +203,14 @@ class Node:
         self.visible = True
 
     def __str__(self):
-        return f"Node(name={self.name}, parent={self.parent}, children={self.children}, " \
+        return f"Node(id={self.id} name={self.name}, parent={self.parent}, children={self.children}, " \
                f"branch={self.branch}, currentBranch={self.currentBranch}, currentNode={self.currentNode})"
 
     def to_dict(self):
         return {
             "id": self.id,
             "name": self.name,
-            "parent": [node.to_dict() for node in self.parent],
+            "parent": [node_id for node_id in self.parent],
             "children": [node.to_dict() for node in self.children],
             "branch": self.branch,
             "currentBranch": self.currentBranch,
@@ -253,6 +254,8 @@ class WorkGraph(APIView):
 
     def post(self, request):
 
+        self.all_node = []
+
         try:
             data_dict = request.data
             print(type(data_dict))
@@ -264,6 +267,8 @@ class WorkGraph(APIView):
 
             remote_allow = False
             remote_nodes: List[Node] = model.data
+
+            self.print_tree(model.data[0])
 
             status = 0
             message = "Success"
@@ -296,12 +301,31 @@ class WorkGraph(APIView):
                     name = self.get_name(model.command)
                     self.merge(model.data, name)
 
+                elif _commad[1] == "cherry-pick":
+                    name_commit = self.get_name_commit_cherry_pick(_commad)
+                    self.cherry_pick(model.data, name_commit)
+
+                elif _commad[1] == "reset":
+                    self.reset_commit()
+
+                elif _commad[1] == "revert":
+                    depth = self.revert_count_commit(_commad)
+                    nodes = model.data
+                    checkout_node = self.find_node_by_checkout(nodes, True, None)
+                    self.revert_commit(nodes[0], checkout_node, depth)
+
                 elif _commad[1] == "push":
                     remote_allow = True
                     remote_nodes = model.data
 
                 elif _commad[1] == "clone":
                     remote_allow = True
+                    remote_nodes = model.data
+
+                elif _commad[1] == "fetch":
+                    remote_allow = True
+                    remote_nodes = model.data
+
 
             else:
                 raise Exception()
@@ -317,7 +341,9 @@ class WorkGraph(APIView):
             response.status_code = 200
             return response
 
+        # self.print_tree(model.data)
         serialized_nodes = json.dumps([node.to_dict() for node in model.data])
+        # print(serialized_nodes)
 
         serialized_nodes_remote = None
         if remote_allow:
@@ -328,6 +354,63 @@ class WorkGraph(APIView):
             "remote_data": serialized_nodes_remote,
             "message": message,
             "code": status})
+
+    def revert_count_commit(self, commands) -> int:
+        return int(commands[2][-1])
+
+    def get_name_commit_cherry_pick(self, commands: List[str]) -> List[str]:
+        try:
+            name_commit = []
+            for index, command in enumerate(commands):
+                if index > 1:
+                    name_commit.append(command)
+
+            return name_commit
+        except Exception as e:
+            traceback.print_exc()
+            return []
+
+    def print_tree(self, root):
+        if not root:
+            return
+
+        queue = deque([(root, 0)])
+
+        while queue:
+            node, level = queue.popleft()
+            self.all_node.append(node)
+            # print("  " * level, end="")
+            # print(node)
+            for child in node.children:
+                queue.append((child, level + 1))
+
+    def revert_commit(self, node: Node, checkout_node: Node, depth: int):
+        prev_node: Node = self.find_prev_node(node, checkout_node.id, depth)
+        prev_node.children.remove(checkout_node)
+
+    def find_prev_node(self, node: Node, parent_id: int, depth: int):
+        parent_node_select = self.get_parent_id_node(node, parent_id)
+        if depth == 0:
+            return parent_node_select
+
+        for parent in parent_node_select.parent:
+            change_depth = depth - 1
+            result = self.find_prev_node(parent_node_select, parent, change_depth)
+            if result is not None:
+                return result
+
+    def get_parent_id_node(self, nodes: Node, id: int):
+        if nodes.id == id:
+            return nodes
+
+        for node in nodes.children:
+            if node:
+                result = self.get_parent_id_node(node, id)
+                if result is not None:
+                    return result
+
+    def reset_commit(self):
+        pass
 
     def get_name_checkout_node(self, name):
         return f"*{name}"
@@ -343,17 +426,108 @@ class WorkGraph(APIView):
         }
         return node_dict
 
+    def cherry_pick(self, nodes: List[Node], commit_list: List[str]):
+        for commit in commit_list:
+            checkout_node = self.find_node_by_checkout(nodes, True, None)
+            print(checkout_node)
+            copy_node = self.find_commit_by_name(nodes[0], commit)
+            print(f"Copy: {copy_node}")
+            self.add_copy_commit(checkout_node, copy_node)
+            self.change_checkout_cherry_pick(checkout_node, copy_node)
+
+    def change_checkout_cherry_pick(self, checkout_node: Node, new_node: Node):
+        new_node.currentNode = checkout_node.currentNode
+        new_node.branch.append(self.get_name_checkout_node(checkout_node.currentBranch))
+        new_node.currentBranch = checkout_node.currentBranch
+        self.clear_branch_data_checkout(checkout_node)
+
+    def add_copy_commit(self, node: Node, copy_node: Node):
+        try:
+            if not node.children:
+                node.children.append(copy_node)
+        except Exception as e:
+            print(f"Error: {e}")
+            traceback.print_exc()
+
+    def find_commit_by_name(self, node: Node, name: str) -> Node or None:
+        if node.name == name:
+            return node
+
+        for child in node.children:
+            if child:
+                result = self.find_commit_by_name(child, name)
+                if result is not None:
+                    return result
+
+        return None
+
     def rebase(self, nodes: List[Node], name: str):
         node = self.find_node_by_checkout(nodes, True, None)
         origin = self.find_last_node_by_branch(nodes[0], name)
+
+        print("Rebase")
+        print(f"Checkout: {node}")
+        print(f"Branch {name}: {origin}")
+
         top_bottom = self.valid_rebase_top_to_down(node, origin)
         bottom_top = self.valid_rebase_top_to_down(origin, node)
 
         print(top_bottom)
         print(bottom_top)
 
-    def get_list_commit_rebase(self):
-        pass
+        if bottom_top:
+            node.branch.append(origin.currentBranch)
+            origin.branch.clear()
+            origin.currentBranch = ""
+        elif top_bottom:
+            return
+        else:
+            parent_node: Node = self.find_node_by_id(nodes[0], node.parent[0])
+            print(parent_node)
+            find_node_remove = self.remove_children_rebase(parent_node.children, node.id)
+            parent_node.children.remove(find_node_remove)
+            origin.children.append(find_node_remove)
+            self.change_to_rebase_commit(find_node_remove)
+
+    def remove_children_rebase(self, nodes: List[Node], id: int) -> Node:
+        for index, node in enumerate(nodes):
+            print(node)
+            if node.id == id:
+                return node
+
+    def find_parent(self, nodes: List[Node], parend_id: int):
+        for node in nodes:
+            if len(node.children) > 1 and node.id == parend_id:
+                return node
+
+    def change_to_rebase_commit(self, node: Node):
+        if node is None:
+            return
+
+        node.name = self.set_rebase_commit(node.name)
+        for child in node.children:
+            if child:
+                self.change_to_rebase_commit(child)
+
+    def set_rebase_commit(self, name: str):
+        return f"{name}'"
+
+    def find_node_by_id(self, node, target_id):
+        if node.id == target_id:
+            return node
+
+        for child_node in node.children:
+            found_node = self.find_node_by_id(child_node, target_id)
+            if found_node is not None:
+                return found_node
+
+        return None
+
+    def add_branch_rebase(self, node: Node, checkout_node: Node):
+        node.branch = []
+        if node.currentBranch:
+            checkout_node.branch.append(str(node.currentBranch))
+        node.currentBranch = ""
 
     def valid_rebase_top_to_down(self, branch_one: Node, branch_two) -> bool:
         for node in branch_one.children:
@@ -369,11 +543,15 @@ class WorkGraph(APIView):
         node = self.find_node_by_checkout(nodes, True, None)
         if not name == node.currentBranch:
             origin = self.find_last_node_by_branch(nodes[0], name)
-            merge = self.merge_nodes(node, origin)
-            other_merge = self.merge_nodes(node, origin)
+
+            new_id = self.find_max_id(nodes)
+            merge = self.merge_nodes(node, origin, new_id)
+            merge.parent.append(node.id)
+            merge.parent.append(origin.id)
+            other_merge = self.merge_nodes(node, origin, new_id)
 
             self.clear_branch_data_checkout(other_merge)
-            origin.children.append(other_merge)
+            # origin.children.append(other_merge)
 
             self.clear_branch_data_checkout(node)
             node.children.append(merge)
@@ -381,10 +559,10 @@ class WorkGraph(APIView):
         else:
             raise Exception()
 
-    def merge_nodes(self, node1: Node, node2: Node) -> Node:
+    def merge_nodes(self, node1: Node, node2: Node, id: int) -> Node:
         merged_node = Node()
-        merged_node.id = node1.id + 1
-        merged_node.name = f"C{node1.id + 1}"
+        merged_node.id = id + 1
+        merged_node.name = f"C{id + 1}"
         merged_node.children = []
         merged_node.parent = []
         merged_node.branch.append(self.get_name_checkout_node(node1.currentBranch))
@@ -415,14 +593,27 @@ class WorkGraph(APIView):
     def commit(self, nodes: List[Node]):
         node = self.find_node_by_checkout(nodes, True, None)
         print(node)
-        new_commit = self.create_node(id=node.id + 1, name=f"C{node.id + 1}", parent=[], children=[],
+        new_id = self.find_max_id(nodes)
+        new_commit = self.create_node(id=new_id + 1, name=f"C{new_id + 1}", parent=[], children=[],
                                       branch=[self.get_name_checkout_node(node.currentBranch)],
                                       current_branch=node.currentBranch, current_node=True)
         node.branch.remove(self.get_name_checkout_node(node.currentBranch))
         node.currentBranch = ""
         node.currentNode = False
 
+        new_commit.parent.append(node.id)
         node.children.append(new_commit)
+
+    def find_max_id(self, nodes: List[Node]):
+        max_id = -1
+
+        for node in nodes:
+            max_id = max(max_id, node.id)
+
+            if node.children:
+                max_id = max(max_id, self.find_max_id(node.children))
+
+        return max_id
 
     def find_last_node_by_branch(self, node: Node, target_current_branch: str) -> Node or None:
         if node.currentBranch == target_current_branch:
@@ -453,7 +644,8 @@ class WorkGraph(APIView):
         return commands.split()[2]
 
     def all_commands(self) -> list:
-        return ["commit", "push", "branch", "checkout", "pull", "clone", "fetch", "merge", "rebase"]
+        return ["commit", "push", "branch", "checkout", "pull", "clone", "fetch", "merge", "rebase", "cherry-pick",
+                "revert", "reset"]
 
     def valid(self, command) -> bool:
         split_list = command.split()
@@ -469,7 +661,7 @@ class WorkGraph(APIView):
                 node = Node()
                 node.id = item.get("id", -1)
                 node.name = item.get('name', "")
-                node.parent = self.parse_nodes(item.get('parent', []))
+                node.parent = item.get('parent', [])
                 node.children = self.parse_nodes(item.get('children', []))
                 node.branch = item.get('branch', [])
                 node.currentBranch = item.get('currentBranch', "")
@@ -491,7 +683,7 @@ class WorkGraph(APIView):
                 node = Node()
                 node.id = item.get("id", -1)
                 node.name = item.get('name', "")
-                node.parent = self.parse_nodes(item.get('parent', []))
+                node.parent = item.get('parent', [])
                 node.children = self.parse_nodes(item.get('children', []))
                 node.branch = item.get('branch', [])
                 node.currentBranch = item.get('currentBranch', "")
@@ -515,9 +707,8 @@ class WorkGraph(APIView):
         for node in nodes:
             self.change_checkout_data_to_false(node)
 
-            if target_current_branch in node.branch and len(node.branch) >= 2:
+            if target_current_branch in node.branch:
                 self.change_checkout_into_one_node(node, target_current_branch)
-
             elif node.currentBranch == target_current_branch:
                 if not node.children:
                     self.change_checkout_data_to_true(node, target_current_branch)
