@@ -1,3 +1,4 @@
+import copy
 import logging
 import traceback
 from collections import deque
@@ -431,11 +432,13 @@ class WorkGraph(APIView):
             checkout_node = self.find_node_by_checkout(nodes, True, None)
             print(checkout_node)
             copy_node = self.find_commit_by_name(nodes[0], commit)
-            print(f"Copy: {copy_node}")
-            self.add_copy_commit(checkout_node, copy_node)
-            self.change_checkout_cherry_pick(checkout_node, copy_node)
+            copy_ = copy.deepcopy(copy_node)
+            print(f"Copy: {copy_}")
+            self.add_copy_commit(checkout_node, copy_)
+            self.change_checkout_cherry_pick(checkout_node, copy_)
 
     def change_checkout_cherry_pick(self, checkout_node: Node, new_node: Node):
+        new_node.name = self.set_rebase_commit(new_node.name)
         new_node.currentNode = checkout_node.currentNode
         new_node.branch.append(self.get_name_checkout_node(checkout_node.currentBranch))
         new_node.currentBranch = checkout_node.currentBranch
@@ -443,8 +446,10 @@ class WorkGraph(APIView):
 
     def add_copy_commit(self, node: Node, copy_node: Node):
         try:
-            if not node.children:
-                node.children.append(copy_node)
+            copy_node.children.clear()
+            copy_node.branch.clear()
+            copy_node.currentBranch = ""
+            node.children.append(copy_node)
         except Exception as e:
             print(f"Error: {e}")
             traceback.print_exc()
