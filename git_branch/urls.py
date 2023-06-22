@@ -3,7 +3,7 @@ from django.urls import path
 from git_branch.views import *
 
 urlpatterns = [
-    path('levels', LevelsApi.as_view()),
+    path('levels', LevelsApi.as_view(), name='levels'),
     path('tasks', TaskApi.as_view()),
     path('tasks/<int:level>/', TaskFromLevel.as_view()),
     path('task_info/<int:task_id>/', TaskInfoApiView.as_view()),

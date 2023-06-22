@@ -41,7 +41,7 @@ class TaskApi(APIView):
     def get(self, request):
         tasks = models.Task.objects.all().values()
         if tasks.count() == 0:
-            message = "Нет данных о уровнях"
+            message = "Нет данных о задачах"
             status = -1
         else:
             message = f"Список всех задач"
