@@ -18,7 +18,7 @@ class Task(models.Model):
     solve = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Задача {self.id}"
+        return f"Задача {self.id} по уровню {self.level_id}"
 
 
 class Info(models.Model):
@@ -26,7 +26,7 @@ class Info(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
 
     def __str__(self):
-        return f"Info {self.id}"
+        return f"Info {self.id} по задаче {self.task_id}"
 
 
 class InfoDetail(models.Model):
@@ -34,7 +34,7 @@ class InfoDetail(models.Model):
     content = models.TextField()
 
     def __str__(self):
-        return f"Content {self.id}"
+        return f"Content {self.id} по Info {self.info_id}"
 
 
 class Node(models.Model):
